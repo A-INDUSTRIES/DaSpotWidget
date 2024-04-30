@@ -1,0 +1,12 @@
+[package]
+name = "daspotwidget"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+iced = { git = "https://github.com/iced-rs/iced.git", default-features = false, features = [
+    "advanced",
+    "image",
+] }
+tokio = "1.37.0"
+rspotify = { version = "0.13.1", features = ["cli"] }
