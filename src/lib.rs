@@ -48,7 +48,7 @@ pub mod player_ctl {
 
     pub fn get_length() -> u32 {
         let length = query_data(QueryKey::MprisLength);
-        length.parse().unwrap_or(0)
+        length.parse().unwrap_or(0) / 1000000
     }
 
     pub fn get_volume() -> f32 {
@@ -58,7 +58,7 @@ pub mod player_ctl {
 
     pub fn get_position() -> u32 {
         let position = query_data(QueryKey::Position);
-        position.parse().unwrap_or(0)
+        position.parse::<f32>().unwrap_or(0.0) as u32
     }
 
     pub fn get_status() -> PlayerStatus {
@@ -133,7 +133,10 @@ pub mod player_ctl {
         };
         let result = command.output();
         match result {
-            Ok(value) => String::from_utf8(value.stdout).unwrap_or("".to_string()),
+            Ok(value) => String::from_utf8(value.stdout)
+                .unwrap_or("".to_string())
+                .trim()
+                .to_string(),
             Err(_) => "".to_string(),
         }
     }
@@ -201,12 +204,15 @@ pub mod image {
     }
 
     async fn download_image(url: &str) -> PathBuf {
-        let mut folder = fetch_config().download_location;
-        folder.push("image.png");
-        let data = get(url).await.unwrap().bytes().await.unwrap();
-        let mut file = File::open(&folder).unwrap();
-        let _ = file.write_all(&data);
-        folder
+        let mut file_path = fetch_config().download_location;
+        let file_name = url.split('/').last().unwrap();
+        file_path.push(file_name);
+        if !file_path.exists() {
+            let data = get(url).await.unwrap().bytes().await.unwrap();
+            let mut file = File::create(&file_path).unwrap();
+            let _ = file.write_all(&data);
+        }
+        file_path
     }
 
     #[main]
