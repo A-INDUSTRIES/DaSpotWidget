@@ -10,6 +10,7 @@ pub mod player_ctl {
         Volume,
         Position,
         Status,
+        Shuffle,
     }
 
     enum PlayerAction {
@@ -59,6 +60,11 @@ pub mod player_ctl {
     pub fn get_position() -> u32 {
         let position = query_data(QueryKey::Position);
         position.parse::<f32>().unwrap_or(0.0) as u32
+    }
+
+    pub fn get_shuffle() -> bool {
+        let shuffle = query_data(QueryKey::Shuffle);
+        shuffle.contains("On")
     }
 
     pub fn get_status() -> PlayerStatus {
@@ -111,8 +117,11 @@ pub mod player_ctl {
     }
 
     pub fn volume(volume: f32) {
-        if !(0.0 < volume && volume < 1.0) {
-            println!("Volume should be between 0.0 and 1.0, will not change volume.");
+        if !(0.0..=1.0).contains(&volume) {
+            println!(
+                "Volume should be between 0.0 and 1.0, will not change volume.\nGot: {}",
+                volume
+            );
             return;
         }
         player_action(PlayerAction::Volume(volume));
@@ -130,6 +139,7 @@ pub mod player_ctl {
             QueryKey::Volume => command.arg("volume"),
             QueryKey::Position => command.arg("position"),
             QueryKey::Status => command.arg("status"),
+            QueryKey::Shuffle => command.arg("shuffle"),
         };
         let result = command.output();
         match result {
@@ -150,8 +160,8 @@ pub mod player_ctl {
             PlayerAction::Previous => command.arg("previous"),
             PlayerAction::Volume(volume) => command.args(["volume", &volume.to_string()]),
             PlayerAction::Shuffle(should_shuffle) => match should_shuffle {
-                true => command.args(["shuffle", "true"]),
-                false => command.args(["shuffle", "false"]),
+                true => command.args(["shuffle", "on"]),
+                false => command.args(["shuffle", "off"]),
             },
             PlayerAction::Position(position) => command.args(["position", &position.to_string()]),
         };
@@ -224,9 +234,11 @@ pub mod image {
             let mut path = PathBuf::new();
             path.push(url.strip_prefix("file://").unwrap());
             Some(path)
-        } else {
+        } else if !url.is_empty() {
             println!("Url type not supported: {}", url);
-            Option::None
+            None
+        } else {
+            None
         }
     }
 }

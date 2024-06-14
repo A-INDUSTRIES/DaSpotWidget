@@ -1,22 +1,21 @@
-#![allow(unused_imports, dead_code)]
+use daspotwidget::image::get_image;
+use daspotwidget::player_ctl::*;
+use iced::settings::Settings;
 use iced::theme::Theme;
-use iced::time;
 use iced::widget::{
-    button, column, container, image, image::Handle, row, slider, text, vertical_slider, Button,
-    Column, Container, Image, Row, Slider, Text, VerticalSlider,
+    button, checkbox, column, image::Handle, row, slider, text, vertical_slider, Column, Image,
+    Row, Slider, VerticalSlider,
 };
+use iced::window;
 use iced::Alignment;
-use iced::Element;
+use iced::Command;
 use iced::Font;
 use iced::Length;
 use iced::Renderer;
 use iced::{program, Subscription};
-use std::borrow::Cow;
+use iced::{time, Point, Size};
 use std::fs::File;
 use std::io::Read;
-
-use daspotwidget::image::get_image;
-use daspotwidget::player_ctl::*;
 
 #[derive(Clone, Debug, Copy)]
 enum Message {
@@ -33,6 +32,7 @@ enum Message {
 struct App {
     volume: f32,
     position: u32,
+    shuffle: bool,
 }
 
 impl Default for App {
@@ -40,6 +40,7 @@ impl Default for App {
         Self {
             volume: get_volume(),
             position: get_position(),
+            shuffle: get_shuffle(),
         }
     }
 }
@@ -58,7 +59,8 @@ impl App {
             button(text("󰙣").size(24)).on_press(Message::Previous),
             button(text("󰐎").size(24)).on_press(Message::PlayPause),
             button(text("󰙡").size(24)).on_press(Message::Next),
-            button(text("").size(24)).on_press(Message::Stop)
+            button(text("").size(24)).on_press(Message::Stop),
+            checkbox("", self.shuffle).on_toggle(Message::Shuffle),
         ]
         .align_items(Alignment::Center)
         .padding(10)
@@ -66,7 +68,9 @@ impl App {
         let song_progress: Slider<u32, Message, Theme> =
             slider(0..=get_length(), self.position, Message::PositionChange).width(200);
         let volume: VerticalSlider<f32, Message, Theme> =
-            vertical_slider(0.0..=1.0, self.volume, Message::VolumeChange).height(100);
+            vertical_slider(0.0..=1.0, self.volume, Message::VolumeChange)
+                .height(100)
+                .step(0.1);
         let mut row = Row::new();
         let image_path = get_image();
         if image_path.is_some() {
@@ -87,18 +91,41 @@ impl App {
             .align_items(Alignment::Center)
     }
 
-    fn update(&mut self, message: Message) {
+    fn update(&mut self, message: Message) -> Command<Message> {
         match message {
-            Message::PlayPause => play_pause(),
-            Message::Next => next(),
-            Message::Previous => previous(),
-            Message::PositionChange(pos) => position(pos),
-            Message::VolumeChange(vol) => volume(vol),
-            Message::Stop => stop(),
-            Message::Shuffle(shu) => shuffle(shu),
+            Message::PlayPause => {
+                play_pause();
+                Command::none()
+            }
+            Message::Next => {
+                next();
+                Command::none()
+            }
+            Message::Previous => {
+                previous();
+                Command::none()
+            }
+            Message::PositionChange(pos) => {
+                position(pos);
+                Command::none()
+            }
+            Message::VolumeChange(vol) => {
+                volume(vol);
+                Command::none()
+            }
+            Message::Stop => {
+                stop();
+                Command::none()
+            }
+            Message::Shuffle(shu) => {
+                shuffle(shu);
+                Command::none()
+            }
             Message::Update => {
                 self.position = get_position();
                 self.volume = get_volume();
+                self.shuffle = get_shuffle();
+                window::resize(window::Id::MAIN, Size::new(100f32, 100f32))
             }
         }
     }
@@ -116,6 +143,13 @@ fn main() -> iced::Result {
     program("DaSpotWidget", App::update, App::view)
         .theme(App::theme)
         .subscription(App::subscription)
-        .default_font(Font::with_name("Hack Nerd Font Mono"))
+        .settings(Settings {
+            window: window::Settings {
+                resizable: true,
+                ..Default::default()
+            },
+            default_font: Font::with_name("Hack Nerd Font Mono"),
+            ..Default::default()
+        })
         .run()
 }
