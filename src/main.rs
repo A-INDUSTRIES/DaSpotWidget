@@ -3,19 +3,26 @@ use daspotwidget::player_ctl::*;
 use iced::settings::Settings;
 use iced::theme::Theme;
 use iced::widget::{
-    button, checkbox, column, image::Handle, row, slider, text, vertical_slider, Column, Image,
-    Row, Slider, VerticalSlider,
+    button, checkbox, column, container, image::Handle, row, slider, text, vertical_slider, Column,
+    Container, Image, Row, Slider, VerticalSlider,
 };
 use iced::window;
+use iced::window::Position::SpecificWith;
 use iced::Alignment;
 use iced::Command;
 use iced::Font;
 use iced::Length;
 use iced::Renderer;
 use iced::{program, Subscription};
-use iced::{time, Point, Size};
+use iced::{time, Size};
+use std::cmp::max;
 use std::fs::File;
 use std::io::Read;
+
+#[cfg(feature = "hyprland")]
+use std::process::Command as ProcCommand;
+
+use iced::Point;
 
 #[derive(Clone, Debug, Copy)]
 enum Message {
@@ -33,6 +40,7 @@ struct App {
     volume: f32,
     position: u32,
     shuffle: bool,
+    current_width: usize,
 }
 
 impl Default for App {
@@ -41,12 +49,13 @@ impl Default for App {
             volume: get_volume(),
             position: get_position(),
             shuffle: get_shuffle(),
+            current_width: 0,
         }
     }
 }
 
 impl App {
-    fn view(&self) -> Row<Message> {
+    fn view(&self) -> Container<Message> {
         let song_info: Column<Message, Theme, Renderer> = column![
             text(get_title()).size(30),
             text(format!("from \"{}\"", get_artist())),
@@ -66,7 +75,8 @@ impl App {
         .padding(10)
         .spacing(5);
         let song_progress: Slider<u32, Message, Theme> =
-            slider(0..=get_length(), self.position, Message::PositionChange).width(200);
+            slider(0..=get_length(), self.position, Message::PositionChange)
+                .width(self.current_width as f32 - 350f32);
         let volume: VerticalSlider<f32, Message, Theme> =
             vertical_slider(0.0..=1.0, self.volume, Message::VolumeChange)
                 .height(100)
@@ -84,11 +94,13 @@ impl App {
         let col = column![song_info, buttons, song_progress]
             .align_items(Alignment::Center)
             .padding(30);
-        row.push(col)
+        row = row
+            .push(col)
             .push(volume)
             .width(Length::Fill)
             .height(Length::Fill)
-            .align_items(Alignment::Center)
+            .align_items(Alignment::Center);
+        container(row).center_x(Length::Fill)
     }
 
     fn update(&mut self, message: Message) -> Command<Message> {
@@ -125,7 +137,13 @@ impl App {
                 self.position = get_position();
                 self.volume = get_volume();
                 self.shuffle = get_shuffle();
-                window::resize(window::Id::MAIN, Size::new(100f32, 100f32))
+                let new_width = compute_size();
+                if self.current_width != new_width {
+                    self.current_width = new_width;
+                    resize_and_move(new_width)
+                } else {
+                    Command::none()
+                }
             }
         }
     }
@@ -135,21 +153,56 @@ impl App {
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        time::every(time::Duration::from_millis(1000)).map(|_| Message::Update)
+        time::every(time::Duration::from_millis(500)).map(|_| Message::Update)
     }
 }
 
+#[cfg(feature = "hyprland")]
+fn resize_and_move(width: usize) -> Command<Message> {
+    let arg = format!("dispatch resizewindowpixel exact {} 220,title:DaSpotWidget ; dispatch movewindowpixel exact 50% 50,title:DaSpotWidget ; dispatch movewindowpixel -{} 0,title:DaSpotWidget", width, width/2);
+    let _ = ProcCommand::new("hyprctl")
+        .args(["--batch", arg.as_str()])
+        .output();
+    Command::none()
+}
+
+#[cfg(not(feature = "hyprland"))]
+fn resize_and_move(&self, width: usize) -> Command<Message> {
+    let resize_command =
+        window::resize::<Message>(window::Id::MAIN, Size::new(width as f32, 220f32));
+    let move_command =
+        window::move_to::<Message>(window::Id::MAIN, Point::new((width / 2) as f32, 0f32));
+    Command::batch([resize_command, move_command])
+}
+
+fn compute_size() -> usize {
+    let title = get_title();
+    let artist = format!("from \"{}\"", get_artist());
+    let album = format!("in album \"{}\"", get_album());
+    let titlesize = title.len() * 19;
+    let artistsize = artist.len() * 11;
+    let albumsize = album.len() * 11;
+    let maxsize = max(max(titlesize, artistsize), albumsize);
+    max(maxsize + 300, 530)
+}
+
 fn main() -> iced::Result {
+    let width = compute_size();
     program("DaSpotWidget", App::update, App::view)
         .theme(App::theme)
         .subscription(App::subscription)
         .settings(Settings {
             window: window::Settings {
+                size: Size::new(width as f32, 220f32),
                 resizable: true,
+                position: SpecificWith(|win, dis| {
+                    Point::new(dis.width - (win.width) / 2f32, 50f32)
+                }),
                 ..Default::default()
             },
             default_font: Font::with_name("Hack Nerd Font Mono"),
             ..Default::default()
         })
+        .load(move || resize_and_move(width))
         .run()
 }
