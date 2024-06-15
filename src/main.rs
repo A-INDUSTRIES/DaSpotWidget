@@ -1,5 +1,6 @@
 use daspotwidget::image::get_image;
 use daspotwidget::player_ctl::*;
+use iced::alignment::Horizontal;
 use iced::settings::Settings;
 use iced::theme::Theme;
 use iced::widget::{
@@ -73,7 +74,8 @@ impl App {
         ]
         .align_items(Alignment::Center)
         .padding(10)
-        .spacing(5);
+        .spacing(5)
+        .width(Length::Shrink);
         let song_progress: Slider<u32, Message, Theme> =
             slider(0..=get_length(), self.position, Message::PositionChange)
                 .width(self.current_width as f32 - 350f32);
@@ -89,7 +91,7 @@ impl App {
             let _ = file.read_to_end(&mut buf);
             let handle = Handle::from_bytes(buf);
             let image = Image::new(handle).width(200).height(200);
-            row = row.push(image);
+            row = row.push(container(image).padding(10).align_x(Horizontal::Center));
         }
         let col = column![song_info, buttons, song_progress]
             .align_items(Alignment::Center)
@@ -100,7 +102,7 @@ impl App {
             .width(Length::Fill)
             .height(Length::Fill)
             .align_items(Alignment::Center);
-        container(row).center_x(Length::Fill)
+        container(row).center(Length::Fill)
     }
 
     fn update(&mut self, message: Message) -> Command<Message> {
