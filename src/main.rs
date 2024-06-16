@@ -1,31 +1,22 @@
 use daspotwidget::image::get_image;
 use daspotwidget::player_ctl::*;
-use iced::alignment::Horizontal;
-use iced::settings::Settings;
-use iced::theme::Theme;
+
 use iced::widget::{
     button, checkbox, column, container, image::Handle, row, slider, text, vertical_slider, Column,
     Container, Image, Row, Slider, VerticalSlider,
 };
-use iced::window;
-use iced::window::Position::SpecificWith;
-use iced::Alignment;
-use iced::Command;
-use iced::Font;
-use iced::Length;
-use iced::Renderer;
-use iced::{program, Subscription};
-use iced::{time, Size};
-use std::cmp::max;
-use std::fs::File;
-use std::io::Read;
+use iced::{
+    alignment::Horizontal, program, settings::Settings, theme::Theme, time, window,
+    window::Position::SpecificWith, Alignment, Command, Font, Length, Point, Renderer, Size,
+    Subscription,
+};
+
+use std::{cmp::max, fs::File, io::Read};
 
 #[cfg(feature = "hyprland")]
 use std::process::Command as ProcCommand;
 
-use iced::Point;
-
-#[derive(Clone, Debug, Copy)]
+#[derive(Clone, Debug)]
 enum Message {
     PlayPause,
     Next,
@@ -36,12 +27,15 @@ enum Message {
     Shuffle(bool),
     Update,
 }
+
 #[derive(Debug)]
 struct App {
     volume: f32,
     position: u32,
     shuffle: bool,
     current_width: usize,
+    current_song: String,
+    image_buffer: Vec<u8>,
 }
 
 impl Default for App {
@@ -51,6 +45,8 @@ impl Default for App {
             position: get_position(),
             shuffle: get_shuffle(),
             current_width: 0,
+            current_song: "".to_string(),
+            image_buffer: Vec::new(),
         }
     }
 }
@@ -84,12 +80,8 @@ impl App {
                 .height(100)
                 .step(0.1);
         let mut row = Row::new();
-        let image_path = get_image();
-        if image_path.is_some() {
-            let mut file = File::open(image_path.unwrap()).unwrap();
-            let mut buf: Vec<u8> = vec![];
-            let _ = file.read_to_end(&mut buf);
-            let handle = Handle::from_bytes(buf);
+        if !self.image_buffer.is_empty() {
+            let handle = Handle::from_bytes(self.image_buffer.clone());
             let image = Image::new(handle).width(200).height(200);
             row = row.push(container(image).padding(10).align_x(Horizontal::Center));
         }
@@ -139,8 +131,16 @@ impl App {
                 self.position = get_position();
                 self.volume = get_volume();
                 self.shuffle = get_shuffle();
-                let new_width = compute_size();
-                if self.current_width != new_width {
+                let new_title = get_title();
+                if new_title != self.current_song {
+                    let image_path = get_image();
+                    if image_path.is_some() {
+                        let mut file = File::open(image_path.unwrap()).unwrap();
+                        self.image_buffer = Vec::new();
+                        let _ = file.read_to_end(&mut self.image_buffer);
+                    }
+                    self.current_song = new_title;
+                    let new_width = compute_size();
                     self.current_width = new_width;
                     resize_and_move(new_width)
                 } else {
@@ -173,7 +173,7 @@ fn resize_and_move(&self, width: usize) -> Command<Message> {
     let resize_command =
         window::resize::<Message>(window::Id::MAIN, Size::new(width as f32, 220f32));
     let move_command =
-        window::move_to::<Message>(window::Id::MAIN, Point::new((width / 2) as f32, 0f32));
+        window::move_to::<Message>(window::Id::MAIN, Point::new((width / 2) as f32, 50f32));
     Command::batch([resize_command, move_command])
 }
 

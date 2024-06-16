@@ -173,49 +173,22 @@ pub mod player_ctl {
 
 pub mod image {
     use reqwest::get;
-    use serde::Deserialize;
-    use serde_json;
     use std::env::temp_dir;
     use std::fs::{create_dir, File};
-    use std::io::{BufReader, Write};
-    use std::path::{Path, PathBuf};
+    use std::io::Write;
+    use std::path::PathBuf;
     use tokio::main;
 
     use super::player_ctl::get_image_url;
 
-    #[derive(Deserialize)]
-    struct Config {
-        download_location: PathBuf,
-    }
-
-    impl Default for Config {
-        fn default() -> Self {
-            Self {
-                download_location: temp_dir(),
-            }
-        }
-    }
-
-    fn fetch_config() -> Config {
-        let user_config = Path::new("~/.config/daspotwidget");
-        if !user_config.exists() {
-            let _ = create_dir(user_config);
-        };
-        let mut config_file = PathBuf::from(user_config);
-        config_file.push("config.json");
-        if !config_file.exists() {
-            Config::default()
-        } else {
-            let file = File::open(config_file).unwrap();
-            let reader = BufReader::new(file);
-            let config: Config = serde_json::from_reader(reader).unwrap();
-            config
-        }
-    }
-
     async fn download_image(url: &str) -> PathBuf {
-        let mut file_path = fetch_config().download_location;
+        let mut folder = temp_dir();
+        folder.push("daspotwidget/");
+        if !folder.exists() {
+            let _ = create_dir(&folder);
+        }
         let file_name = url.split('/').last().unwrap();
+        let mut file_path = folder;
         file_path.push(file_name);
         if !file_path.exists() {
             let data = get(url).await.unwrap().bytes().await.unwrap();
