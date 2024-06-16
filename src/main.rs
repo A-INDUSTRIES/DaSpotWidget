@@ -169,7 +169,7 @@ fn resize_and_move(width: usize) -> Command<Message> {
 }
 
 #[cfg(not(feature = "hyprland"))]
-fn resize_and_move(&self, width: usize) -> Command<Message> {
+fn resize_and_move(width: usize) -> Command<Message> {
     let resize_command =
         window::resize::<Message>(window::Id::MAIN, Size::new(width as f32, 220f32));
     let move_command =
